@@ -34,6 +34,17 @@ CREATE TABLE IF NOT EXISTS orion_ods.client (
     updated_timestamp      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS orion_ods.app_user (
+    id                 SERIAL PRIMARY KEY,
+    username           TEXT NOT NULL UNIQUE,
+    display_name       TEXT NOT NULL,
+    password_hash      TEXT NOT NULL,
+    role               TEXT NOT NULL DEFAULT 'admin',
+    is_active          BOOLEAN NOT NULL DEFAULT TRUE,
+    created_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS orion_ods.case (
     id                       SERIAL PRIMARY KEY,
     case_name                TEXT NOT NULL,
