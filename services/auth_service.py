@@ -14,6 +14,7 @@ from db.connection import get_connection
 
 SESSION_USER_KEY = "auth_user"
 SESSION_LOGOUT_KEY = "auth_logout"
+SESSION_BLOCK_RESTORE_KEY = "auth_block_cookie_restore"
 SESSION_COOKIE_NAME = "orion_session"
 DEFAULT_SESSION_TTL_DAYS = 7
 APP_USER_TABLE = "orion_ods.app_user"
@@ -52,12 +53,19 @@ def _session_ttl_seconds() -> int:
 
 
 COOKIE_MANAGER_KEY = "_orion_cookie_manager"
+COOKIE_OP_COUNTER_KEY = "_orion_cookie_op_counter"
 
 
 def get_cookie_manager():
     if COOKIE_MANAGER_KEY not in st.session_state:
         st.session_state[COOKIE_MANAGER_KEY] = stx.CookieManager()
     return st.session_state[COOKIE_MANAGER_KEY]
+
+
+def _next_cookie_widget_key(action: str) -> str:
+    count = st.session_state.get(COOKIE_OP_COUNTER_KEY, 0) + 1
+    st.session_state[COOKIE_OP_COUNTER_KEY] = count
+    return f"{action}_{SESSION_COOKIE_NAME}_{count}"
 
 
 def _make_session_token(user_id: int) -> str:
@@ -88,22 +96,28 @@ def _set_session_cookie(user_id: int):
         SESSION_COOKIE_NAME,
         token,
         expires_at=expires,
-        key=f"set_{SESSION_COOKIE_NAME}",
+        key=_next_cookie_widget_key("set"),
     )
 
 
 def _clear_session_cookie():
     cm = get_cookie_manager()
+    widget_key = _next_cookie_widget_key("delete")
     try:
-        cm.delete(SESSION_COOKIE_NAME, key=f"delete_{SESSION_COOKIE_NAME}")
+        cm.delete(SESSION_COOKIE_NAME, key=widget_key)
     except KeyError:
-        cm.cookie_manager(
-            method="delete",
-            cookie=SESSION_COOKIE_NAME,
-            key=f"delete_{SESSION_COOKIE_NAME}",
-            default=False,
-        )
-        cm.cookies.pop(SESSION_COOKIE_NAME, None)
+        try:
+            cm.cookie_manager(
+                method="delete",
+                cookie=SESSION_COOKIE_NAME,
+                key=widget_key,
+                default=False,
+            )
+        except Exception:
+            pass
+    cookies = getattr(cm, "cookies", None)
+    if cookies is not None:
+        cookies.pop(SESSION_COOKIE_NAME, None)
 
 
 def hash_password(password: str) -> str:
@@ -395,15 +409,25 @@ def is_admin(user: Optional[Dict]) -> bool:
     return bool(user and user.get("role") == "admin")
 
 
-def login(user: dict, *, persist_cookie: bool = True):
-    st.session_state.pop(SESSION_LOGOUT_KEY, None)
+def _set_session_user(user: dict):
     st.session_state[SESSION_USER_KEY] = user
-    if persist_cookie:
-        _set_session_cookie(user["id"])
+
+
+def login(user: dict, *, persist_cookie: bool = True):
+    """Sign in from the login form, or refresh in-memory session state."""
+    _set_session_user(user)
+    if not persist_cookie:
+        return
+
+    st.session_state.pop(SESSION_LOGOUT_KEY, None)
+    st.session_state.pop(SESSION_BLOCK_RESTORE_KEY, None)
+    _clear_session_cookie()
+    _set_session_cookie(user["id"])
 
 
 def logout():
     st.session_state[SESSION_LOGOUT_KEY] = True
+    st.session_state[SESSION_BLOCK_RESTORE_KEY] = True
     st.session_state.pop(SESSION_USER_KEY, None)
     st.session_state.pop("page", None)
     _clear_session_cookie()
@@ -420,8 +444,6 @@ def complete_pending_logout() -> bool:
     cookies = get_cookie_manager().get_all()
     if cookies and cookies.get(SESSION_COOKIE_NAME):
         _clear_session_cookie()
-    elif cookies is not None:
-        st.session_state.pop(SESSION_LOGOUT_KEY, None)
 
     return True
 
@@ -439,6 +461,9 @@ def restore_session_from_cookie() -> Optional[bool]:
         return True
 
     if st.session_state.get(SESSION_LOGOUT_KEY):
+        return False
+
+    if st.session_state.get(SESSION_BLOCK_RESTORE_KEY):
         return False
 
     cookies = get_cookie_manager().get_all()
@@ -459,14 +484,13 @@ def restore_session_from_cookie() -> Optional[bool]:
         _clear_session_cookie()
         return False
 
-    login(
+    _set_session_user(
         {
             "id": updated["id"],
             "username": updated["username"],
             "display_name": updated["display_name"],
             "role": updated["role"],
-        },
-        persist_cookie=False,
+        }
     )
     return True
 
@@ -487,5 +511,5 @@ def refresh_current_user():
         "display_name": updated["display_name"],
         "role": updated["role"],
     }
-    login(session_user, persist_cookie=False)
+    _set_session_user(session_user)
     return session_user
