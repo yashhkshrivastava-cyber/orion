@@ -3,4 +3,6 @@ MODULES = {
     "Capability": "modules.capability",
     "Expense Type": "modules.expense_type",
     "Client": "modules.client",
+    "Case": "modules.case",
+    "Employee": "modules.employee",
 }

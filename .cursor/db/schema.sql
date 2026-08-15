@@ -63,23 +63,47 @@ CREATE TABLE IF NOT EXISTS orion_ods.app_user (
     password_hash      TEXT NOT NULL,
     role               TEXT NOT NULL DEFAULT 'admin',
     is_active          BOOLEAN NOT NULL DEFAULT TRUE,
+    ods_access         BOOLEAN NOT NULL DEFAULT FALSE,
+    dw_access          BOOLEAN NOT NULL DEFAULT FALSE,
     created_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE SEQUENCE IF NOT EXISTS orion_ods.case_seq START 1;
+
 CREATE TABLE IF NOT EXISTS orion_ods.case (
-    id                       SERIAL PRIMARY KEY,
+    case_code                TEXT PRIMARY KEY DEFAULT (
+        'CS-' || LPAD(nextval('orion_ods.case_seq')::TEXT, 4, '0')
+    ),
     case_name                TEXT NOT NULL,
-    client_id                INTEGER REFERENCES orion_ods.client(id),
-    capability_id            INTEGER REFERENCES orion_ods.capability(id),
-    business_domain_id       INTEGER REFERENCES orion_ods.business_domain(id),
+    client_code              TEXT REFERENCES orion_ods.client(client_code),
     case_start_date          DATE,
+    case_status              TEXT CHECK (case_status IN ('Active', 'Inactive')),
     case_end_date            DATE,
-    case_status              TEXT,
+    capability_code          TEXT REFERENCES orion_ods.capability(capability_code),
     monthly_expected_revenue NUMERIC,
-    monthly_allowed_km       NUMERIC,
+    monthly_allowed_km       INTEGER,
+    business_domain_code     TEXT REFERENCES orion_ods.business_domain(business_domain_code),
     case_onboarded           BOOLEAN DEFAULT FALSE,
-    case_onboarded_date      DATE,
     created_timestamp        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_timestamp        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    last_updated_timestamp   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE SEQUENCE IF NOT EXISTS orion_ods.employee_seq START 1;
+
+CREATE TABLE IF NOT EXISTS orion_ods.employee (
+    employee_code        TEXT PRIMARY KEY DEFAULT (
+        'EMP-' || LPAD(nextval('orion_ods.employee_seq')::TEXT, 4, '0')
+    ),
+    employee_name        TEXT NOT NULL,
+    employee_status      TEXT CHECK (employee_status IN ('Active', 'Inactive')),
+    emp_start_date       DATE,
+    emp_end_date         DATE,
+    employee_type        TEXT,
+    client_facing        BOOLEAN DEFAULT FALSE,
+    employee_designation TEXT,
+    manager_code         TEXT REFERENCES orion_ods.employee(employee_code),
+    employee_case_code   TEXT REFERENCES orion_ods.case(case_code),
+    created_timestamp    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_updated_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
