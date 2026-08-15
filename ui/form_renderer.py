@@ -1,7 +1,7 @@
 import streamlit as st
 
 from db.db_utils import fetch_dropdown
-from utils.location_data import STATE_CITY_MAP
+from utils.location_data import get_cities_for_state
 
 
 def _is_truthy(value):
@@ -10,6 +10,36 @@ def _is_truthy(value):
 
 def _field_key(col, key_prefix):
     return f"{key_prefix}_{col}" if key_prefix else col
+
+
+def _outside_form_fields(form_fields):
+    """Fields that must render outside st.form so dependent selects can refresh."""
+    outside = set()
+    for col, config in form_fields.items():
+        if config["type"] == "dependent_select":
+            outside.add(col)
+            outside.add(config.get("depends_on", "client_location_state"))
+    return outside
+
+
+def _partition_fields(form_fields, scope):
+    outside = _outside_form_fields(form_fields)
+    regular = []
+    dependent = []
+
+    for col, config in form_fields.items():
+        if config["type"] == "auto_date":
+            continue
+        if scope == "inside_form" and col in outside:
+            continue
+        if scope == "outside_form" and col not in outside:
+            continue
+        if config["type"] == "dependent_select":
+            dependent.append((col, config))
+        else:
+            regular.append((col, config))
+
+    return regular, dependent
 
 
 def _render_single_field(col, config, record, key_prefix, inputs):
@@ -81,34 +111,41 @@ def _render_single_field(col, config, record, key_prefix, inputs):
     if field_type == "dependent_select":
         depends_on = config.get("depends_on", "client_location_state")
         state = inputs.get(depends_on)
-        cities = STATE_CITY_MAP.get(state, [])
+        cities = get_cities_for_state(state)
+        city_key = f"{field_key}__{state}" if state else field_key
+        if not cities:
+            st.selectbox(
+                config["label"],
+                options=["Select a state first"],
+                disabled=True,
+                key=city_key,
+            )
+            return None
         if record is None:
-            return st.selectbox(config["label"], cities, key=field_key)
+            return st.selectbox(config["label"], cities, key=city_key)
         return st.selectbox(
             config["label"],
             cities,
             index=cities.index(default_val) if default_val in cities else 0,
-            key=field_key,
+            key=city_key,
         )
 
     return None
 
 
-def render_form_fields(form_fields, record=None, key_prefix=""):
+def render_form_fields(form_fields, record=None, key_prefix="", scope="all"):
     """
     Render form fields from entity metadata in a two-column layout.
+
+    scope:
+      - "all": render every field (legacy; dependent selects won't refresh inside st.form)
+      - "outside_form": state/city and other dependent chains — reruns on change
+      - "inside_form": everything except fields that must live outside st.form
 
     Returns a dict of column name -> user input value.
     """
     inputs = {}
-    regular = []
-    dependent = []
-
-    for col, config in form_fields.items():
-        if config["type"] == "dependent_select":
-            dependent.append((col, config))
-        elif config["type"] != "auto_date":
-            regular.append((col, config))
+    regular, dependent = _partition_fields(form_fields, scope)
 
     if regular:
         col_left, col_right = st.columns(2)

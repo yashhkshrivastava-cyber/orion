@@ -31,11 +31,18 @@ def _render_data_preview(meta):
 
 def _render_create_form(meta, dataset):
     with orion_panel("Create record", f"Add a new entry to {dataset}"):
+        key_prefix = f"create_{dataset}"
+        outside_inputs = render_form_fields(
+            meta.FORM_FIELDS, key_prefix=key_prefix, scope="outside_form"
+        )
         with st.form(f"create_{meta.TABLE}"):
-            inputs = render_form_fields(meta.FORM_FIELDS, key_prefix=f"create_{dataset}")
+            inside_inputs = render_form_fields(
+                meta.FORM_FIELDS, key_prefix=key_prefix, scope="inside_form"
+            )
             submitted = st.form_submit_button("Create record", type="primary", use_container_width=True)
 
         if submitted:
+            inputs = {**outside_inputs, **inside_inputs}
             apply_auto_date_fields(inputs, meta.FORM_FIELDS)
             insert(meta.TABLE, list(inputs.keys()), list(inputs.values()))
             st.success("Record created successfully.")
@@ -52,15 +59,24 @@ def _render_update_form(meta, dataset):
         record = fetch_by_id(meta.TABLE, selected_id)
         render_record_preview(record)
 
+        key_prefix = f"update_{dataset}_{selected_id}"
+        outside_inputs = render_form_fields(
+            meta.FORM_FIELDS,
+            record=record,
+            key_prefix=key_prefix,
+            scope="outside_form",
+        )
         with st.form(f"update_{meta.TABLE}"):
-            inputs = render_form_fields(
+            inside_inputs = render_form_fields(
                 meta.FORM_FIELDS,
                 record=record,
-                key_prefix=f"update_{dataset}_{selected_id}",
+                key_prefix=key_prefix,
+                scope="inside_form",
             )
             submitted = st.form_submit_button("Save changes", type="primary", use_container_width=True)
 
         if submitted:
+            inputs = {**outside_inputs, **inside_inputs}
             apply_auto_date_fields(inputs, meta.FORM_FIELDS, record=record)
             update(meta.TABLE, list(inputs.keys()), list(inputs.values()), selected_id)
             st.success("Record updated successfully.")
