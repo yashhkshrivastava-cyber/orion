@@ -3,25 +3,45 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from ui.styles import back_button, page_header, render_metric_card, section_title
+from ui.theme import CHART_COLORS, CHART_LAYOUT
+
+
+def _apply_chart_theme(fig):
+    fig.update_layout(**CHART_LAYOUT)
+    return fig
+
+
+def _chart_block(title, fig):
+    with st.container(border=True):
+        section_title(title)
+        st.plotly_chart(_apply_chart_theme(fig), use_container_width=True)
+
 
 def render_dashboard():
-    if st.button("⬅️ Back"):
+    if back_button():
         st.session_state.page = "home"
+        st.rerun()
 
-    st.title("📊 Orion Command Center")
+    page_header("Command Center", "Real-time overview of your business metrics", theme_key="dashboard")
 
-    st.markdown("### 📌 Key Metrics")
+    section_title("Key Metrics")
 
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    metrics = [
+        ("Revenue", "₹12.4L", "+12%", "positive"),
+        ("Expense", "₹8.1L", "-4%", "negative"),
+        ("Headcount", "124", "+3", "positive"),
+        ("Active Cases", "32", "", "neutral"),
+        ("KM Today", "328", "", "neutral"),
+        ("Open Opportunities", "18", "", "neutral"),
+    ]
 
-    col1.metric("💰 Revenue", "₹12.4L", "+12%")
-    col2.metric("💸 Expense", "₹8.1L", "-4%")
-    col3.metric("👥 Headcount", "124", "+3")
-    col4.metric("📂 Active Cases", "32")
-    col5.metric("🚗 KM Today", "328")
-    col6.metric("📈 Open Opp", "18")
+    metric_cols = st.columns(6)
+    for col, (label, value, delta, delta_type) in zip(metric_cols, metrics):
+        with col:
+            render_metric_card(label, value, delta, delta_type)
 
-    st.divider()
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
 
@@ -44,59 +64,58 @@ def render_dashboard():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### 📈 Revenue Breakdown")
-
         fig = px.bar(
             revenue,
             x="Month",
             y=["Prospective", "Committed"],
             barmode="stack",
-            title="Monthly Revenue",
-            color_discrete_sequence=["#636EFA", "#00CC96"],
+            color_discrete_sequence=[CHART_COLORS[0], CHART_COLORS[2]],
         )
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_layout(title=None, showlegend=True)
+        _chart_block("Revenue Breakdown", fig)
 
     with col2:
-        st.markdown("### 💸 Expense Breakdown")
-
         fig = px.bar(
             expense,
             x="Month",
             y=["Prospective", "Committed"],
             barmode="stack",
-            title="Monthly Expense",
-            color_discrete_sequence=["#EF553B", "#AB63FA"],
+            color_discrete_sequence=[CHART_COLORS[4], CHART_COLORS[1]],
         )
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
+        fig.update_layout(title=None, showlegend=True)
+        _chart_block("Expense Breakdown", fig)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### 👥 Headcount Distribution")
-
         headcount = pd.DataFrame({"Type": ["Active", "Inactive"], "Count": [96, 28]})
-
-        fig = px.pie(headcount, names="Type", values="Count", hole=0.6)
-        st.plotly_chart(fig, use_container_width=True)
+        fig = px.pie(
+            headcount,
+            names="Type",
+            values="Count",
+            hole=0.65,
+            color_discrete_sequence=[CHART_COLORS[3], CHART_COLORS[5]],
+        )
+        fig.update_traces(textposition="inside", textinfo="percent+label")
+        fig.update_layout(title=None)
+        _chart_block("Headcount Distribution", fig)
 
     with col2:
-        st.markdown("### 📊 Opportunity Pipeline")
-
         opp = pd.DataFrame(
             {
                 "Stage": ["Proposal", "Financial Bid", "Technical Bid"],
                 "Count": [8, 5, 5],
             }
         )
-
-        fig = px.funnel(opp, x="Count", y="Stage", color="Stage")
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
-
-    st.markdown("### 💼 Case-wise Revenue (YTD)")
+        fig = px.funnel(
+            opp,
+            x="Count",
+            y="Stage",
+            color="Stage",
+            color_discrete_sequence=CHART_COLORS[:3],
+        )
+        fig.update_layout(title=None, showlegend=False)
+        _chart_block("Opportunity Pipeline", fig)
 
     case_rev = pd.DataFrame(
         {
@@ -110,21 +129,19 @@ def render_dashboard():
         x="Case",
         y="Revenue",
         color="Revenue",
-        color_continuous_scale="blues",
+        color_continuous_scale=[[0, CHART_COLORS[0]], [1, CHART_COLORS[2]]],
     )
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(title=None, coloraxis_showscale=False)
+    _chart_block("Case-wise Revenue (YTD)", fig)
 
-    st.divider()
+    section_title("Performance Snapshot")
 
-    st.markdown("### 🔥 Performance Snapshot")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Top Performing Case", "Case B")
-
-    with col2:
-        st.metric("Highest Revenue Month", "March")
-
-    with col3:
-        st.metric("Efficiency Score", "87%")
+    snap_cols = st.columns(3)
+    snapshot = [
+        ("Top Performing Case", "Case B"),
+        ("Highest Revenue Month", "March"),
+        ("Efficiency Score", "87%"),
+    ]
+    for col, (label, value) in zip(snap_cols, snapshot):
+        with col:
+            render_metric_card(label, value)

@@ -1,35 +1,27 @@
 import streamlit as st
 
 from services.auth_service import authenticate, login
+from ui.styles import render_login_branding, render_login_footer
 
 
 def render_login():
-    st.markdown(
-        """
-        <style>
-        .login-card {
-            max-width: 420px;
-            margin: 4rem auto 0 auto;
-            padding: 2rem;
-            border: 1px solid rgba(49, 51, 63, 0.2);
-            border-radius: 0.75rem;
-            background: rgba(255, 255, 255, 0.02);
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    _, center, _ = st.columns([1, 1.2, 1])
+    _, center, _ = st.columns([1, 1.05, 1])
 
     with center:
-        st.title("Orion")
-        st.caption("Sign in to access your workspace")
+        with st.container(border=True):
+            render_login_branding()
 
-        with st.form("login_form", clear_on_submit=False):
-            username = st.text_input("Username", autocomplete="username")
-            password = st.text_input("Password", type="password", autocomplete="current-password")
-            submitted = st.form_submit_button("Sign in", use_container_width=True, type="primary")
+            with st.form("login_form", clear_on_submit=False):
+                username = st.text_input("Username", placeholder="Enter your username", autocomplete="username")
+                password = st.text_input(
+                    "Password",
+                    type="password",
+                    placeholder="Enter your password",
+                    autocomplete="current-password",
+                )
+                submitted = st.form_submit_button("Sign in to Orion", use_container_width=True, type="primary")
+
+            render_login_footer()
 
         if submitted:
             if not username.strip() or not password:

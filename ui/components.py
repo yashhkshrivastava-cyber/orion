@@ -4,16 +4,14 @@ def build_record_options(records):
 
 
 def render_record_preview(record):
-    import pandas as pd
-    import streamlit as st
+    from ui.styles import panel_header, render_kv_preview
 
     if record:
-        st.subheader("📄 Selected Record Preview")
-        df = pd.DataFrame([record])
-        st.dataframe(df, use_container_width=True)
+        panel_header("Selected record", "Review the current values before saving")
+        render_kv_preview(record)
 
 
-def select_record(records, label="Select Record"):
+def select_record(records, label="Select record"):
     import streamlit as st
 
     if not records:

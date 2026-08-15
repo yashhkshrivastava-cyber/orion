@@ -7,14 +7,21 @@ from services.auth_service import (
     logout,
     refresh_current_user,
 )
+from ui.styles import inject_global_styles, render_brand, render_user_card
 from views.admin import render_admin
 from views.dashboard import render_dashboard
 from views.data_management import render_data_management
 from views.home import render_home
 from views.login import render_login
 
-st.set_page_config(page_title="Orion", layout="wide")
+st.set_page_config(
+    page_title="Orion",
+    page_icon="✦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
+inject_global_styles(intense_background=True)
 ensure_default_admin()
 
 if not get_current_user():
@@ -40,17 +47,25 @@ if not can_access_page(user, st.session_state.page):
     st.session_state.page = "home"
 
 with st.sidebar:
-    st.title("Orion")
-    st.caption(f"Signed in as **{user['display_name']}** ({user['role']})")
-    if st.button("Sign out", use_container_width=True):
+    render_brand()
+    render_user_card(user["display_name"], user["role"])
+
+    if st.button("Sign out", use_container_width=True, type="secondary"):
         logout()
         st.rerun()
-    st.divider()
+
+    st.markdown("<div style='margin: 1rem 0; border-top: 1px solid rgba(148,163,184,0.12);'></div>", unsafe_allow_html=True)
 
     for page_id, (label, _) in PAGES.items():
         if not can_access_page(user, page_id):
             continue
-        if st.button(label, use_container_width=True, type="primary" if st.session_state.page == page_id else "secondary"):
+        is_active = st.session_state.page == page_id
+        if st.button(
+            label,
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+            key=f"nav_{page_id}",
+        ):
             st.session_state.page = page_id
             st.rerun()
 
