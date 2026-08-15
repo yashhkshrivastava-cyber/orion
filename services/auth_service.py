@@ -33,6 +33,17 @@ ROLE_LABELS = {
     "viewer": "Viewer — dashboard only",
 }
 
+ROLE_DEFAULT_DATA_ACCESS = {
+    "admin": (True, True),
+    "editor": (True, False),
+    "viewer": (False, False),
+}
+
+USER_SELECT_COLUMNS = (
+    "id, username, display_name, role, is_active, "
+    "ods_access, dw_access, created_timestamp"
+)
+
 USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9._-]{3,32}$")
 
 
@@ -128,9 +139,13 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 
-def _row_to_user(row, columns):
+def _session_user_from_row(row, columns):
     user = dict(zip(columns, row))
     user.pop("password_hash", None)
+    if "ods_access" not in user:
+        ods_default, dw_default = ROLE_DEFAULT_DATA_ACCESS.get(user.get("role"), (False, False))
+        user["ods_access"] = ods_default
+        user["dw_access"] = dw_default
     return user
 
 
@@ -140,7 +155,8 @@ def _fetch_user_by_username(username: str):
     try:
         cur.execute(
             f"""
-            SELECT id, username, display_name, password_hash, role, is_active
+            SELECT id, username, display_name, password_hash, role, is_active,
+                   ods_access, dw_access
             FROM {APP_USER_TABLE}
             WHERE username = %s
             """,
@@ -162,7 +178,7 @@ def fetch_user_by_id(user_id: int):
     try:
         cur.execute(
             f"""
-            SELECT id, username, display_name, role, is_active, created_timestamp
+            SELECT {USER_SELECT_COLUMNS}
             FROM {APP_USER_TABLE}
             WHERE id = %s
             """,
@@ -172,7 +188,7 @@ def fetch_user_by_id(user_id: int):
         if not row:
             return None
         cols = [desc[0] for desc in cur.description]
-        return _row_to_user(row, cols)
+        return _session_user_from_row(row, cols)
     finally:
         cur.close()
         conn.close()
@@ -184,14 +200,14 @@ def list_users():
     try:
         cur.execute(
             f"""
-            SELECT id, username, display_name, role, is_active, created_timestamp
+            SELECT {USER_SELECT_COLUMNS}
             FROM {APP_USER_TABLE}
             ORDER BY username
             """
         )
         rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description]
-        return [_row_to_user(row, cols) for row in rows]
+        return [_session_user_from_row(row, cols) for row in rows]
     finally:
         cur.close()
         conn.close()
@@ -246,7 +262,15 @@ def validate_password(password: str) -> Optional[str]:
     return None
 
 
-def create_user(username: str, display_name: str, password: str, role: str = "viewer"):
+def create_user(
+    username: str,
+    display_name: str,
+    password: str,
+    role: str = "viewer",
+    *,
+    ods_access: Optional[bool] = None,
+    dw_access: Optional[bool] = None,
+):
     username = username.strip()
     display_name = display_name.strip()
 
@@ -261,15 +285,45 @@ def create_user(username: str, display_name: str, password: str, role: str = "vi
     if _fetch_user_by_username(username):
         raise ValueError("Username already exists.")
 
+    default_ods, default_dw = ROLE_DEFAULT_DATA_ACCESS[role]
+    ods_access = default_ods if ods_access is None else ods_access
+    dw_access = default_dw if dw_access is None else dw_access
+
     conn = get_connection()
     cur = conn.cursor()
     try:
         cur.execute(
             f"""
-            INSERT INTO {APP_USER_TABLE} (username, display_name, password_hash, role)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO {APP_USER_TABLE} (
+                username, display_name, password_hash, role, ods_access, dw_access
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (username, display_name, hash_password(password), role),
+            (username, display_name, hash_password(password), role, ods_access, dw_access),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def update_user_data_access(user_id: int, ods_access: bool, dw_access: bool, acting_user_id: int):
+    target = fetch_user_by_id(user_id)
+    if not target:
+        raise ValueError("User not found.")
+    if user_id == acting_user_id and not ods_access and not dw_access:
+        raise ValueError("You cannot remove all data access from your own account.")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""
+            UPDATE {APP_USER_TABLE}
+            SET ods_access = %s, dw_access = %s, updated_timestamp = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (ods_access, dw_access, user_id),
         )
         conn.commit()
     finally:
@@ -396,12 +450,32 @@ def authenticate(username: str, password: str):
         "username": user["username"],
         "display_name": user["display_name"],
         "role": user["role"],
+        "ods_access": user.get("ods_access", ROLE_DEFAULT_DATA_ACCESS.get(user["role"], (False, False))[0]),
+        "dw_access": user.get("dw_access", ROLE_DEFAULT_DATA_ACCESS.get(user["role"], (False, False))[1]),
     }
+
+
+def can_access_ods(user: Optional[Dict]) -> bool:
+    if not user or not user.get("is_active", True):
+        return False
+    if "ods_access" in user:
+        return bool(user["ods_access"])
+    return user.get("role") in ("admin", "editor")
+
+
+def can_access_dw(user: Optional[Dict]) -> bool:
+    if not user or not user.get("is_active", True):
+        return False
+    if "dw_access" in user:
+        return bool(user["dw_access"])
+    return user.get("role") == "admin"
 
 
 def can_access_page(user: Optional[Dict], page_id: str) -> bool:
     if not user:
         return False
+    if page_id == "data":
+        return can_access_ods(user) or can_access_dw(user)
     return page_id in ROLE_PAGES.get(user["role"], set())
 
 
@@ -490,6 +564,8 @@ def restore_session_from_cookie() -> Optional[bool]:
             "username": updated["username"],
             "display_name": updated["display_name"],
             "role": updated["role"],
+            "ods_access": updated.get("ods_access", False),
+            "dw_access": updated.get("dw_access", False),
         }
     )
     return True
@@ -510,6 +586,8 @@ def refresh_current_user():
         "username": updated["username"],
         "display_name": updated["display_name"],
         "role": updated["role"],
+        "ods_access": updated.get("ods_access", False),
+        "dw_access": updated.get("dw_access", False),
     }
     _set_session_user(session_user)
     return session_user

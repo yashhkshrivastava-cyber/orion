@@ -12,30 +12,49 @@ def _field_key(col, key_prefix):
     return f"{key_prefix}_{col}" if key_prefix else col
 
 
+def _depends_on_fields(form_fields):
+    fields = set()
+    for col, config in form_fields.items():
+        if config["type"] == "dependent_select":
+            fields.add(col)
+            fields.add(config.get("depends_on", "client_location_state"))
+    return fields
+
+
 def _outside_form_fields(form_fields):
-    """Fields that must render outside st.form so widgets can rerun the page."""
+    """Fields that must render outside st.form so dependent selects can refresh."""
     outside = set()
     for col, config in form_fields.items():
         if config["type"] == "dependent_select":
             outside.add(col)
             outside.add(config.get("depends_on", "client_location_state"))
-        if config["type"] == "date":
-            outside.add(col)
     return outside
 
 
 def _partition_fields(form_fields, scope):
     outside = _outside_form_fields(form_fields)
+    depends = _depends_on_fields(form_fields)
     regular = []
     dependent = []
 
     for col, config in form_fields.items():
         if config["type"] == "auto_date":
             continue
-        if scope == "inside_form" and col in outside:
+
+        if scope in ("core", "inside_form"):
+            include = col not in outside
+        elif scope == "location":
+            include = col in depends
+        elif scope == "outside_form":
+            include = col in outside
+        elif scope == "all":
+            include = True
+        else:
             continue
-        if scope == "outside_form" and col not in outside:
+
+        if not include:
             continue
+
         if config["type"] == "dependent_select":
             dependent.append((col, config))
         else:
@@ -64,17 +83,29 @@ def _render_single_field(col, config, record, key_prefix, inputs):
     if field_type == "number":
         return st.number_input(config["label"], key=field_key)
 
+    if field_type == "integer":
+        return int(st.number_input(config["label"], step=1, key=field_key))
+
     if field_type == "date":
-        if record is None:
-            use_date = st.checkbox(f"Set {config['label']}", key=f"{field_key}_check")
-            return st.date_input(config["label"], key=field_key) if use_date else None
-        has_value = default_val is not None
-        use_date = st.checkbox(
-            f"Set {config['label']}",
-            value=has_value,
-            key=f"{field_key}_check",
-        )
-        return st.date_input(config["label"], value=default_val, key=field_key) if use_date else None
+        with st.container(border=True):
+            if record is None:
+                use_date = st.checkbox(f"Include {config['label']}", key=f"{field_key}_check")
+            else:
+                has_value = default_val is not None
+                use_date = st.checkbox(
+                    f"Update {config['label']}",
+                    value=has_value,
+                    key=f"{field_key}_check",
+                )
+            if use_date:
+                if record is not None and default_val is not None:
+                    return st.date_input(
+                        config["label"],
+                        value=default_val,
+                        key=field_key,
+                    )
+                return st.date_input(config["label"], key=field_key)
+        return None
 
     if field_type == "boolean":
         if record is None:
@@ -93,13 +124,29 @@ def _render_single_field(col, config, record, key_prefix, inputs):
         )
 
     if field_type == "select" and "source_table" in config:
-        fk_data = fetch_dropdown(config["source_table"], config["source_display_column"])
+        pk_column = config.get("source_pk_column", "id")
+        fk_data = fetch_dropdown(
+            config["source_table"],
+            config["source_display_column"],
+            pk_column,
+        )
         fk_options = {f"{r[1]} ({r[0]})": r[0] for r in fk_data}
+        if config.get("optional"):
+            fk_options = {"— None —": None, **fk_options}
+        if not fk_data and config.get("optional"):
+            st.selectbox(
+                config["label"],
+                options=["— None —"],
+                key=field_key,
+            )
+            return None
         if record is None:
             selected_label = st.selectbox(config["label"], list(fk_options.keys()), key=field_key)
             return fk_options[selected_label]
         reverse = {v: k for k, v in fk_options.items()}
         selected_display = reverse.get(default_val)
+        if default_val is None and config.get("optional"):
+            selected_display = "— None —"
         selected_label = st.selectbox(
             config["label"],
             list(fk_options.keys()),
@@ -140,9 +187,11 @@ def render_form_fields(form_fields, record=None, key_prefix="", scope="all"):
     Render form fields from entity metadata in a two-column layout.
 
     scope:
-      - "all": render every field (legacy; dependent selects won't refresh inside st.form)
-      - "outside_form": state/city and other dependent chains — reruns on change
-      - "inside_form": everything except fields that must live outside st.form
+      - "all": render every field
+      - "core": main editable fields (including dates)
+      - "location": state/city dependent fields
+      - "inside_form": alias for core
+      - "outside_form": location fields only
 
     Returns a dict of column name -> user input value.
     """

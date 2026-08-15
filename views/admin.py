@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from services.auth_service import (
+    ROLE_DEFAULT_DATA_ACCESS,
     ROLE_LABELS,
     ROLES,
     create_user,
@@ -10,6 +11,7 @@ from services.auth_service import (
     list_users,
     refresh_current_user,
     set_user_active,
+    update_user_data_access,
     update_user_password,
     update_user_role,
 )
@@ -32,11 +34,15 @@ def _render_user_list():
                 "display_name": "Display Name",
                 "role": "Role",
                 "status": "Status",
+                "ods_access": "ODS",
+                "dw_access": "DW",
                 "created_timestamp": "Created",
             }
         )
+        df["ODS"] = df["ODS"].map({True: "Yes", False: "—"})
+        df["DW"] = df["DW"].map({True: "Yes", False: "—"})
         st.dataframe(
-            df[["Username", "Display Name", "Role", "Status", "Created"]],
+            df[["Username", "Display Name", "Role", "ODS", "DW", "Status", "Created"]],
             use_container_width=True,
             hide_index=True,
         )
@@ -52,11 +58,24 @@ def _render_create_user():
             with col2:
                 password = st.text_input("Password", type="password", placeholder="Min. 8 characters")
                 role = st.selectbox("Role", ROLES, format_func=lambda r: ROLE_LABELS[r])
+            defaults = ROLE_DEFAULT_DATA_ACCESS[role]
+            access_col1, access_col2 = st.columns(2)
+            with access_col1:
+                ods_access = st.checkbox("Operational database (ODS)", value=defaults[0])
+            with access_col2:
+                dw_access = st.checkbox("Data warehouse (DW)", value=defaults[1])
             submitted = st.form_submit_button("Create user", type="primary", use_container_width=True)
 
         if submitted:
             try:
-                create_user(username, display_name, password, role)
+                create_user(
+                    username,
+                    display_name,
+                    password,
+                    role,
+                    ods_access=ods_access,
+                    dw_access=dw_access,
+                )
                 st.success(f"User '{username.strip()}' created.")
                 st.rerun()
             except ValueError as exc:
@@ -127,6 +146,27 @@ def _render_manage_user():
                     st.rerun()
                 except ValueError as exc:
                     st.error(str(exc))
+
+    with orion_panel("Data access", "Control ODS and DW permissions independently of role"):
+        ods_access = st.checkbox(
+            "Operational database (ODS)",
+            value=bool(selected_user.get("ods_access")),
+            key=f"ods_access_{selected_id}",
+        )
+        dw_access = st.checkbox(
+            "Data warehouse (DW)",
+            value=bool(selected_user.get("dw_access")),
+            key=f"dw_access_{selected_id}",
+        )
+        if st.button("Update data access", key=f"update_data_access_{selected_id}", use_container_width=True):
+            try:
+                update_user_data_access(selected_id, ods_access, dw_access, current_user["id"])
+                if is_self:
+                    refresh_current_user()
+                st.success("Data access updated.")
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
 
     with orion_panel("Reset password", "Set a new password for this account"):
         with st.form(f"reset_password_{selected_id}"):
