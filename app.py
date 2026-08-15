@@ -2,10 +2,12 @@ import streamlit as st
 
 from services.auth_service import (
     can_access_page,
+    complete_pending_logout,
     ensure_default_admin,
     get_current_user,
     logout,
     refresh_current_user,
+    restore_session_from_cookie,
 )
 from ui.styles import inject_global_styles, render_brand, render_user_card
 from views.admin import render_admin
@@ -23,6 +25,14 @@ st.set_page_config(
 
 inject_global_styles(intense_background=True)
 ensure_default_admin()
+
+if complete_pending_logout():
+    render_login()
+    st.stop()
+
+auth_ready = restore_session_from_cookie()
+if auth_ready is None:
+    st.stop()
 
 if not get_current_user():
     render_login()
@@ -51,8 +61,10 @@ with st.sidebar:
     render_user_card(user["display_name"], user["role"])
 
     if st.button("Sign out", use_container_width=True, type="secondary"):
-        logout()
-        st.rerun()
+        try:
+            logout()
+        finally:
+            st.rerun()
 
     st.markdown("<div style='margin: 1rem 0; border-top: 1px solid rgba(148,163,184,0.12);'></div>", unsafe_allow_html=True)
 

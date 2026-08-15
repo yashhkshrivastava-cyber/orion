@@ -1,13 +1,21 @@
+import hashlib
+import hmac
 import os
 import re
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import bcrypt
+import extra_streamlit_components as stx
 import streamlit as st
 
 from db.connection import get_connection
 
 SESSION_USER_KEY = "auth_user"
+SESSION_LOGOUT_KEY = "auth_logout"
+SESSION_COOKIE_NAME = "orion_session"
+DEFAULT_SESSION_TTL_DAYS = 7
 APP_USER_TABLE = "orion_ods.app_user"
 
 ROLES = ("admin", "editor", "viewer")
@@ -29,6 +37,73 @@ USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9._-]{3,32}$")
 
 def _env(name: str, default: str) -> str:
     return os.environ.get(name, default)
+
+
+def _session_secret() -> bytes:
+    return _env(
+        "ORION_SESSION_SECRET",
+        "orion-dev-session-secret-change-in-production",
+    ).encode()
+
+
+def _session_ttl_seconds() -> int:
+    days = int(_env("ORION_SESSION_TTL_DAYS", str(DEFAULT_SESSION_TTL_DAYS)))
+    return max(1, days) * 86400
+
+
+COOKIE_MANAGER_KEY = "_orion_cookie_manager"
+
+
+def get_cookie_manager():
+    if COOKIE_MANAGER_KEY not in st.session_state:
+        st.session_state[COOKIE_MANAGER_KEY] = stx.CookieManager()
+    return st.session_state[COOKIE_MANAGER_KEY]
+
+
+def _make_session_token(user_id: int) -> str:
+    exp = int(time.time()) + _session_ttl_seconds()
+    payload = f"{user_id}:{exp}"
+    sig = hmac.new(_session_secret(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}:{sig}"
+
+
+def _parse_session_token(token: str) -> Optional[int]:
+    try:
+        user_id_str, exp_str, sig = token.split(":")
+        payload = f"{user_id_str}:{exp_str}"
+        expected = hmac.new(_session_secret(), payload.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        if int(exp_str) < time.time():
+            return None
+        return int(user_id_str)
+    except (ValueError, TypeError):
+        return None
+
+
+def _set_session_cookie(user_id: int):
+    token = _make_session_token(user_id)
+    expires = datetime.now(timezone.utc) + timedelta(seconds=_session_ttl_seconds())
+    get_cookie_manager().set(
+        SESSION_COOKIE_NAME,
+        token,
+        expires_at=expires,
+        key=f"set_{SESSION_COOKIE_NAME}",
+    )
+
+
+def _clear_session_cookie():
+    cm = get_cookie_manager()
+    try:
+        cm.delete(SESSION_COOKIE_NAME, key=f"delete_{SESSION_COOKIE_NAME}")
+    except KeyError:
+        cm.cookie_manager(
+            method="delete",
+            cookie=SESSION_COOKIE_NAME,
+            key=f"delete_{SESSION_COOKIE_NAME}",
+            default=False,
+        )
+        cm.cookies.pop(SESSION_COOKIE_NAME, None)
 
 
 def hash_password(password: str) -> str:
@@ -320,17 +395,80 @@ def is_admin(user: Optional[Dict]) -> bool:
     return bool(user and user.get("role") == "admin")
 
 
-def login(user: dict):
+def login(user: dict, *, persist_cookie: bool = True):
+    st.session_state.pop(SESSION_LOGOUT_KEY, None)
     st.session_state[SESSION_USER_KEY] = user
+    if persist_cookie:
+        _set_session_cookie(user["id"])
 
 
 def logout():
+    st.session_state[SESSION_LOGOUT_KEY] = True
     st.session_state.pop(SESSION_USER_KEY, None)
     st.session_state.pop("page", None)
+    _clear_session_cookie()
+
+
+def complete_pending_logout() -> bool:
+    """Keep the login screen visible while a sign-out finishes clearing cookies."""
+    if not st.session_state.get(SESSION_LOGOUT_KEY):
+        return False
+
+    st.session_state.pop(SESSION_USER_KEY, None)
+    st.session_state.pop("page", None)
+
+    cookies = get_cookie_manager().get_all()
+    if cookies and cookies.get(SESSION_COOKIE_NAME):
+        _clear_session_cookie()
+    elif cookies is not None:
+        st.session_state.pop(SESSION_LOGOUT_KEY, None)
+
+    return True
 
 
 def get_current_user():
     return st.session_state.get(SESSION_USER_KEY)
+
+
+def restore_session_from_cookie() -> Optional[bool]:
+    """Restore auth from a signed browser cookie after refresh.
+
+    Returns True when authenticated, False when not, None while cookies load.
+    """
+    if get_current_user():
+        return True
+
+    if st.session_state.get(SESSION_LOGOUT_KEY):
+        return False
+
+    cookies = get_cookie_manager().get_all()
+    if cookies is None:
+        return None
+
+    token = cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        return False
+
+    user_id = _parse_session_token(token)
+    if not user_id:
+        _clear_session_cookie()
+        return False
+
+    updated = fetch_user_by_id(user_id)
+    if not updated or not updated["is_active"]:
+        _clear_session_cookie()
+        return False
+
+    login(
+        {
+            "id": updated["id"],
+            "username": updated["username"],
+            "display_name": updated["display_name"],
+            "role": updated["role"],
+        },
+        persist_cookie=False,
+    )
+    return True
 
 
 def refresh_current_user():
@@ -349,5 +487,5 @@ def refresh_current_user():
         "display_name": updated["display_name"],
         "role": updated["role"],
     }
-    login(session_user)
+    login(session_user, persist_cookie=False)
     return session_user
