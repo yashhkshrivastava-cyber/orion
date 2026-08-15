@@ -30,6 +30,7 @@ run_pg -d "${DB_NAME}" -f "${SCRIPT_DIR}/seed.sql"
 run_pg -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA orion_ods TO ${DB_USER};"
 run_pg -d "${DB_NAME}" -c "GRANT ALL ON ALL TABLES IN SCHEMA orion_ods TO ${DB_USER};"
 run_pg -d "${DB_NAME}" -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA orion_ods TO ${DB_USER};"
+run_pg -d "${DB_NAME}" -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA orion_ods TO ${DB_USER};"
 run_pg -d "${DB_NAME}" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA orion_ods GRANT ALL ON TABLES TO ${DB_USER};"
 run_pg -d "${DB_NAME}" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA orion_ods GRANT ALL ON SEQUENCES TO ${DB_USER};"
 

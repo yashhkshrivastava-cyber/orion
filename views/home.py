@@ -1,36 +1,67 @@
 import streamlit as st
 
+from services.auth_service import can_access_page, get_current_user
+
 
 def render_home():
+    user = get_current_user()
+
     st.title("🚀 Orion Platform")
     st.markdown("### Choose where you want to go")
 
-    col1, col2 = st.columns(2)
+    cards = []
 
-    with col1:
-        st.markdown(
-            """
-        <div style="padding:30px;border-radius:15px;background-color:#1f77b4;color:white;text-align:center">
-            <h2>📊 Dashboard</h2>
-            <p>View KPIs, Revenue, Expense & Analytics</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
+    if can_access_page(user, "dashboard"):
+        cards.append(
+            {
+                "title": "📊 Dashboard",
+                "description": "View KPIs, Revenue, Expense & Analytics",
+                "color": "#1f77b4",
+                "page": "dashboard",
+                "label": "Open Dashboard",
+            }
         )
 
-        if st.button("Open Dashboard"):
-            st.session_state.page = "dashboard"
-
-    with col2:
-        st.markdown(
-            """
-        <div style="padding:30px;border-radius:15px;background-color:#ff7f0e;color:white;text-align:center">
-            <h2>🛠️ Data Management</h2>
-            <p>Create, Update & Manage Data</p>
-        </div>
-        """,
-            unsafe_allow_html=True,
+    if can_access_page(user, "data"):
+        cards.append(
+            {
+                "title": "🛠️ Data Management",
+                "description": "Create, Update & Manage Data",
+                "color": "#ff7f0e",
+                "page": "data",
+                "label": "Open Data Management",
+            }
         )
 
-        if st.button("Open Data Management"):
-            st.session_state.page = "data"
+    if can_access_page(user, "admin"):
+        cards.append(
+            {
+                "title": "🛡️ Admin Panel",
+                "description": "Manage users, roles, and access",
+                "color": "#2ca02c",
+                "page": "admin",
+                "label": "Open Admin Panel",
+            }
+        )
+
+    if not cards:
+        st.warning("No pages are available for your account.")
+        return
+
+    columns = st.columns(len(cards))
+
+    for column, card in zip(columns, cards):
+        with column:
+            st.markdown(
+                f"""
+                <div style="padding:30px;border-radius:15px;background-color:{card['color']};color:white;text-align:center">
+                    <h2>{card['title']}</h2>
+                    <p>{card['description']}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            if st.button(card["label"], key=f"open_{card['page']}"):
+                st.session_state.page = card["page"]
+                st.rerun()
