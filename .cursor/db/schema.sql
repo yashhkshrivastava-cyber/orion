@@ -37,20 +37,23 @@ CREATE TABLE IF NOT EXISTS orion_ods.expense_type (
     last_updated_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE SEQUENCE IF NOT EXISTS orion_ods.client_seq START 1;
+
 CREATE TABLE IF NOT EXISTS orion_ods.client (
-    id                     SERIAL PRIMARY KEY,
+    client_code            TEXT PRIMARY KEY DEFAULT (
+        'CL-' || LPAD(nextval('orion_ods.client_seq')::TEXT, 4, '0')
+    ),
     client_name            TEXT NOT NULL,
-    client_status          TEXT,
+    client_status          TEXT CHECK (client_status IN ('Active', 'Inactive')),
     client_start_date      DATE,
     client_end_date        DATE,
     client_location_state  TEXT,
     client_location_city   TEXT,
     client_type            TEXT,
     firm_priority          TEXT,
-    client_onboarded       BOOLEAN DEFAULT FALSE,
-    client_onboarded_date  DATE,
+    client_onboarded       DATE,
     created_timestamp      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_timestamp      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    last_updated_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS orion_ods.app_user (
