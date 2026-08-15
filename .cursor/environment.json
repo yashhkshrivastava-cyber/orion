@@ -1,7 +1,8 @@
 {
   "name": "Orion Platform",
-  "install": "bash .cursor/scripts/install.sh",
-  "start": "bash .cursor/scripts/start.sh",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
   "ports": [
     {
       "name": "streamlit",
@@ -11,7 +12,7 @@
   "terminals": [
     {
       "name": "streamlit",
-      "command": "export PATH=\"$HOME/.local/bin:$PATH\" DB_HOST=127.0.0.1 DB_PORT=15432 && streamlit run app.py --server.headless true --server.port 8501",
+      "command": "set -a && [ -f .cursor/runtime.env ] && . .cursor/runtime.env; set +a && ./.venv/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true",
       "description": "Orion Streamlit web app"
     }
   ]
