@@ -14,12 +14,27 @@ CREATE TABLE IF NOT EXISTS orion_ods.business_domain (
     last_updated_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE SEQUENCE IF NOT EXISTS orion_ods.capability_seq START 1;
+
 CREATE TABLE IF NOT EXISTS orion_ods.capability (
-    id                 SERIAL PRIMARY KEY,
-    capability_name    TEXT NOT NULL,
-    capability_head    TEXT,
-    created_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    capability_code        TEXT PRIMARY KEY DEFAULT (
+        'CAP-' || LPAD(nextval('orion_ods.capability_seq')::TEXT, 4, '0')
+    ),
+    capability_name        TEXT NOT NULL,
+    capability_head        TEXT,
+    created_timestamp      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_updated_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE SEQUENCE IF NOT EXISTS orion_ods.expense_type_seq START 1;
+
+CREATE TABLE IF NOT EXISTS orion_ods.expense_type (
+    expense_type_code      TEXT PRIMARY KEY DEFAULT (
+        'EXP-' || LPAD(nextval('orion_ods.expense_type_seq')::TEXT, 4, '0')
+    ),
+    expense_type_name      TEXT NOT NULL,
+    created_timestamp      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_updated_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS orion_ods.client (

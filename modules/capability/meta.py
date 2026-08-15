@@ -1,5 +1,7 @@
 TABLE = "orion_ods.capability"
 
+PRIMARY_KEY = "capability_code"
+
 DISPLAY_COLUMN = "capability_name"
 
 FORM_FIELDS = {
