@@ -12,9 +12,12 @@ SELECT v, h FROM (VALUES
 ) AS s(v, h)
 WHERE NOT EXISTS (SELECT 1 FROM orion_ods.capability);
 
-INSERT INTO orion_ods.client (client_name, client_status, client_location_state, client_location_city, client_type, firm_priority, client_onboarded, client_onboarded_date)
-SELECT n, st, stt, ct, tp, pr, ob, obd FROM (VALUES
-    ('Acme Corp',    'Active',   'Maharashtra', 'Mumbai',    'Private', 'P1', TRUE,  CURRENT_DATE),
-    ('Globex',       'Active',   'Karnataka',   'Bangalore', 'Govt',    'P2', FALSE, NULL::date)
-) AS s(n, st, stt, ct, tp, pr, ob, obd)
+INSERT INTO orion_ods.client (
+    client_name, client_status, client_location_state, client_location_city,
+    client_type, firm_priority, client_onboarded
+)
+SELECT n, st, stt, ct, tp, pr, ob FROM (VALUES
+    ('Acme Corp', 'Active', 'Maharashtra', 'Mumbai',    'Private', 'P1', CURRENT_DATE),
+    ('Globex',    'Active', 'Karnataka',   'Bangalore', 'Govt',    'P2', NULL::date)
+) AS s(n, st, stt, ct, tp, pr, ob)
 WHERE NOT EXISTS (SELECT 1 FROM orion_ods.client);

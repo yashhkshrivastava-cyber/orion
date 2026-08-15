@@ -13,12 +13,14 @@ def _field_key(col, key_prefix):
 
 
 def _outside_form_fields(form_fields):
-    """Fields that must render outside st.form so dependent selects can refresh."""
+    """Fields that must render outside st.form so widgets can rerun the page."""
     outside = set()
     for col, config in form_fields.items():
         if config["type"] == "dependent_select":
             outside.add(col)
             outside.add(config.get("depends_on", "client_location_state"))
+        if config["type"] == "date":
+            outside.add(col)
     return outside
 
 
