@@ -53,5 +53,11 @@ FORM_FIELDS = {
     "client_onboarded": {
         "label": "Onboarded",
         "type": "boolean"
+    },
+
+    "client_onboarded_date": {
+        "label": "Onboarded Date",
+        "type": "auto_date",
+        "depends_on": "client_onboarded"
     }
 }
