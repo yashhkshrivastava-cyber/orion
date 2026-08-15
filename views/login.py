@@ -1,10 +1,19 @@
+from typing import Optional
+
 import streamlit as st
 
 from services.auth_service import authenticate, login
 from ui.styles import render_login_branding, render_login_footer
 
 
-def render_login():
+def render_login() -> Optional[bool]:
+    """Render the login screen.
+
+    Returns:
+        True  — user authenticated this run
+        False — form submitted but credentials were invalid
+        None  — form not submitted yet
+    """
     _, center, _ = st.columns([1, 1.05, 1])
 
     with center:
@@ -23,13 +32,17 @@ def render_login():
 
             render_login_footer()
 
-        if submitted:
-            if not username.strip() or not password:
-                st.error("Enter both username and password.")
-            else:
-                user = authenticate(username, password)
-                if user:
-                    login(user)
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password.")
+        if not submitted:
+            return None
+
+        if not username.strip() or not password:
+            st.error("Enter both username and password.")
+            return False
+
+        user = authenticate(username, password)
+        if user:
+            login(user)
+            return True
+
+        st.error("Invalid username or password.")
+        return False

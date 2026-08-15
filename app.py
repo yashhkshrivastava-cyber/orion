@@ -27,7 +27,21 @@ inject_global_styles(intense_background=True)
 ensure_default_admin()
 
 if complete_pending_logout():
-    render_login()
+    login_result = render_login()
+    if login_result is True:
+        st.rerun()
+    st.stop()
+
+if not get_current_user():
+    login_result = render_login()
+    if login_result is True:
+        st.rerun()
+    if login_result is None:
+        auth_ready = restore_session_from_cookie()
+        if auth_ready is None:
+            st.stop()
+        if get_current_user():
+            st.rerun()
     st.stop()
 
 auth_ready = restore_session_from_cookie()
