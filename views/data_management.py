@@ -18,6 +18,10 @@ def _load_entity_meta(dataset):
     return importlib.import_module(f"{module_path}.meta")
 
 
+def _pk_column(meta):
+    return getattr(meta, "PRIMARY_KEY", "id")
+
+
 def _render_data_preview(meta):
     with orion_panel("Data preview", "Latest 10 records from the selected dataset"):
         cols, data = fetch_top_n(meta.TABLE, 10)
@@ -49,14 +53,15 @@ def _render_create_form(meta, dataset):
 
 
 def _render_update_form(meta, dataset):
-    records = fetch_dropdown(meta.TABLE, meta.DISPLAY_COLUMN)
+    pk = _pk_column(meta)
+    records = fetch_dropdown(meta.TABLE, meta.DISPLAY_COLUMN, pk)
     if not records:
         st.warning("No records available to update.")
         return
 
     with orion_panel("Update record", "Select a record and edit its fields"):
         selected_id = select_record(records)
-        record = fetch_by_id(meta.TABLE, selected_id)
+        record = fetch_by_id(meta.TABLE, selected_id, pk)
         render_record_preview(record)
 
         key_prefix = f"update_{dataset}_{selected_id}"
@@ -78,25 +83,26 @@ def _render_update_form(meta, dataset):
         if submitted:
             inputs = {**outside_inputs, **inside_inputs}
             apply_auto_date_fields(inputs, meta.FORM_FIELDS, record=record)
-            update(meta.TABLE, list(inputs.keys()), list(inputs.values()), selected_id)
+            update(meta.TABLE, list(inputs.keys()), list(inputs.values()), selected_id, pk)
             st.success("Record updated successfully.")
 
 
 def _render_delete_form(meta):
-    records = fetch_dropdown(meta.TABLE, meta.DISPLAY_COLUMN)
+    pk = _pk_column(meta)
+    records = fetch_dropdown(meta.TABLE, meta.DISPLAY_COLUMN, pk)
     if not records:
         st.warning("No records available to delete.")
         return
 
     with orion_panel("Delete record", "This action cannot be undone"):
         selected_id = select_record(records, label="Record to delete")
-        record = fetch_by_id(meta.TABLE, selected_id)
+        record = fetch_by_id(meta.TABLE, selected_id, pk)
         render_record_preview(record)
 
         confirm = st.checkbox("I understand this deletion is permanent")
         if st.button("Delete record", type="primary", use_container_width=True):
             if confirm:
-                delete_record(meta.TABLE, selected_id)
+                delete_record(meta.TABLE, selected_id, pk)
                 st.success("Record deleted.")
             else:
                 st.warning("Please confirm deletion first.")

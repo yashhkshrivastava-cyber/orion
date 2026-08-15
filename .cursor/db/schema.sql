@@ -3,11 +3,15 @@
 
 CREATE SCHEMA IF NOT EXISTS orion_ods;
 
+CREATE SEQUENCE IF NOT EXISTS orion_ods.business_domain_seq START 1;
+
 CREATE TABLE IF NOT EXISTS orion_ods.business_domain (
-    id                    SERIAL PRIMARY KEY,
-    business_domain_name  TEXT NOT NULL,
-    created_timestamp     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_timestamp     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    business_domain_code   TEXT PRIMARY KEY DEFAULT (
+        'BD-' || LPAD(nextval('orion_ods.business_domain_seq')::TEXT, 4, '0')
+    ),
+    business_domain_name   TEXT NOT NULL,
+    created_timestamp      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_updated_timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS orion_ods.capability (
