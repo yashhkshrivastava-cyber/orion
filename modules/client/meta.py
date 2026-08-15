@@ -1,3 +1,5 @@
+from utils.location_data import get_all_states
+
 TABLE = "orion_ods.client"
 
 DISPLAY_COLUMN = "client_name"
@@ -27,9 +29,7 @@ FORM_FIELDS = {
     "client_location_state": {
         "label": "State",
         "type": "select",
-        "options": [
-            "Maharashtra", "Delhi", "Karnataka", "Tamil Nadu", "UP","MP"
-        ]
+        "options": get_all_states(),
     },
 
     "client_location_city": {
