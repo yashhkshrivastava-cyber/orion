@@ -1,14 +1,13 @@
 import os
-import sys
 from pathlib import Path
 
 import psycopg2
-from psycopg2 import sql
 
 _ENV_LOADED = False
-# Previous hardcoded / example passwords. Used only to rotate the role to
-# ORION_DB_PASSWORD (orion_dev_password) on first successful connect.
-_LEGACY_PASSWORDS = ("StrongPassword123", "change-me-strong-password")
+# Shared Tailscale Postgres at 100.71.92.51 still uses StrongPassword123.
+# Local Homebrew / cloud-agent Postgres uses orion_dev_password.
+_PASSWORDS = ("orion_dev_password", "StrongPassword123", "change-me-strong-password")
+_TAILSCALE_DB_HOST = "100.71.92.51"
 
 
 def _load_dotenv():
@@ -40,50 +39,31 @@ def _env(primary: str, fallback: str, default: str) -> str:
 
 def _connect_params():
     _load_dotenv()
+    host = _env("ORION_DB_HOST", "DB_HOST", "localhost")
+    default_password = (
+        "StrongPassword123" if host == _TAILSCALE_DB_HOST else "orion_dev_password"
+    )
     return {
-        "host": _env("ORION_DB_HOST", "DB_HOST", "localhost"),
+        "host": host,
         "database": _env("ORION_DB_NAME", "DB_NAME", "orion"),
         "user": _env("ORION_DB_USER", "DB_USER", "orion_user"),
-        "password": _env("ORION_DB_PASSWORD", "DB_PASSWORD", "orion_dev_password"),
+        "password": _env("ORION_DB_PASSWORD", "DB_PASSWORD", default_password),
         "port": int(_env("ORION_DB_PORT", "DB_PORT", "5432")),
     }
 
 
-def _rotate_role_password(conn, user: str, new_password: str) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            sql.SQL("ALTER ROLE {} PASSWORD %s").format(sql.Identifier(user)),
-            (new_password,),
-        )
-    conn.commit()
-
-
 def get_connection():
     params = _connect_params()
-    try:
-        return psycopg2.connect(**params)
-    except psycopg2.OperationalError as exc:
-        message = str(exc)
-        if "password authentication failed" not in message:
-            raise
-        wanted = params["password"]
-        if wanted in _LEGACY_PASSWORDS:
-            raise
-        for legacy in _LEGACY_PASSWORDS:
-            if not legacy or legacy == wanted:
-                continue
-            try:
-                conn = psycopg2.connect(**{**params, "password": legacy})
-            except psycopg2.OperationalError:
-                continue
-            try:
-                _rotate_role_password(conn, params["user"], wanted)
-            finally:
-                conn.close()
-            print(
-                "Updated orion_user to ORION_DB_PASSWORD on "
-                f"{params['host']}:{params['port']}.",
-                file=sys.stderr,
-            )
-            return psycopg2.connect(**params)
-        raise
+    tried = []
+    last_error = None
+    for password in (params["password"], *_PASSWORDS):
+        if password in tried:
+            continue
+        tried.append(password)
+        try:
+            return psycopg2.connect(**{**params, "password": password})
+        except psycopg2.OperationalError as exc:
+            if "password authentication failed" not in str(exc):
+                raise
+            last_error = exc
+    raise last_error

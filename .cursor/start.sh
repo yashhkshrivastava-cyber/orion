@@ -76,7 +76,7 @@ start_remote_postgres() {
   start_tailscale
   connect_tailscale
   start_db_tunnel
-  write_runtime_env "127.0.0.1" "$DB_TUNNEL_PORT" "${ORION_DB_PASSWORD:-orion_dev_password}"
+  write_runtime_env "127.0.0.1" "$DB_TUNNEL_PORT" "${ORION_DB_PASSWORD:-StrongPassword123}"
   echo "Remote DB tunnel ready on 127.0.0.1:${DB_TUNNEL_PORT}."
 }
 
