@@ -44,20 +44,21 @@ def render_dashboard():
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+    rng = np.random.default_rng(42)
 
     revenue = pd.DataFrame(
         {
             "Month": months,
-            "Prospective": np.random.randint(4000, 1200000, 6),
-            "Committed": np.random.randint(80000, 2000000, 6),
+            "Prospective": rng.integers(4000, 1200000, 6),
+            "Committed": rng.integers(80000, 2000000, 6),
         }
     )
 
     expense = pd.DataFrame(
         {
             "Month": months,
-            "Prospective": np.random.randint(200000, 800000, 6),
-            "Committed": np.random.randint(60000, 140000, 6),
+            "Prospective": rng.integers(200000, 800000, 6),
+            "Committed": rng.integers(60000, 140000, 6),
         }
     )
 
@@ -120,7 +121,7 @@ def render_dashboard():
     case_rev = pd.DataFrame(
         {
             "Case": ["Case A", "Case B", "Case C", "Case D", "Case E"],
-            "Revenue": np.random.randint(100, 500, 5),
+            "Revenue": rng.integers(100, 500, 5),
         }
     )
 
