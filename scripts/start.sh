@@ -16,11 +16,21 @@ if [ -f ".env" ]; then
   set +a
 fi
 
+# Shared Tailscale Postgres still authenticates as orion_user / StrongPassword123.
+if [ "${ORION_DB_HOST:-${DB_HOST:-}}" = "100.71.92.51" ]; then
+  export ORION_DB_HOST=100.71.92.51
+  export ORION_DB_PORT=5432
+  export ORION_DB_NAME=orion
+  export ORION_DB_USER=orion_user
+  export ORION_DB_PASSWORD=StrongPassword123
+fi
+
 PORT="${ORION_PORT:-8501}"
 BIND="${ORION_BIND:-0.0.0.0}"
 
 if ! pg_isready -h "${ORION_DB_HOST:-localhost}" -p "${ORION_DB_PORT:-5432}" -q; then
-  echo "PostgreSQL is not running. Start it with: brew services start postgresql@18" >&2
+  echo "PostgreSQL is not accepting connections at ${ORION_DB_HOST:-localhost}:${ORION_DB_PORT:-5432}" >&2
+  echo "For local Homebrew Postgres: brew services start postgresql@18" >&2
   exit 1
 fi
 

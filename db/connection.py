@@ -4,7 +4,9 @@ from pathlib import Path
 import psycopg2
 
 _ENV_LOADED = False
-_LEGACY_TAILSCALE_HOST = "100.71.92.51"
+_TAILSCALE_DB_HOST = "100.71.92.51"
+_TAILSCALE_DB_USER = "orion_user"
+_TAILSCALE_DB_PASSWORD = "StrongPassword123"
 
 
 def _load_dotenv():
@@ -32,21 +34,21 @@ def _load_dotenv():
 
 def get_connection():
     _load_dotenv()
-    host = os.environ.get("ORION_DB_HOST", "localhost")
-    # Older checkouts exported DB_HOST=100.71.92.51. That Tailscale Postgres
-    # still authenticates as orion_user / StrongPassword123, not orion_app.
-    if host == _LEGACY_TAILSCALE_HOST:
+    host = os.environ.get("ORION_DB_HOST") or os.environ.get("DB_HOST") or "localhost"
+    # Mac checkouts still point at this Tailscale Postgres. Its role password is
+    # StrongPassword123; ignore a mismatched ORION_DB_PASSWORD from .env.
+    if host == _TAILSCALE_DB_HOST:
         return psycopg2.connect(
-            host=host,
+            host=_TAILSCALE_DB_HOST,
             database="orion",
-            user="orion_user",
-            password="StrongPassword123",
+            user=_TAILSCALE_DB_USER,
+            password=_TAILSCALE_DB_PASSWORD,
             port=5432,
         )
     return psycopg2.connect(
         host=host,
-        database=os.environ.get("ORION_DB_NAME", "orion"),
-        user=os.environ.get("ORION_DB_USER", "orion_app"),
-        password=os.environ.get("ORION_DB_PASSWORD", "orion_dev_password"),
-        port=int(os.environ.get("ORION_DB_PORT", "5432")),
+        database=os.environ.get("ORION_DB_NAME") or os.environ.get("DB_NAME") or "orion",
+        user=os.environ.get("ORION_DB_USER") or os.environ.get("DB_USER") or "orion_app",
+        password=os.environ.get("ORION_DB_PASSWORD") or os.environ.get("DB_PASSWORD") or "orion_dev_password",
+        port=int(os.environ.get("ORION_DB_PORT") or os.environ.get("DB_PORT") or "5432"),
     )
