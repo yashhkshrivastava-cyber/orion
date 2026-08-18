@@ -782,12 +782,16 @@ def render_brand():
 
 
 def render_user_card(display_name: str, role: str):
-    initial = display_name.strip()[0].upper() if display_name else "?"
+    from html import escape
+
+    safe_name = escape(display_name or "")
+    safe_role = escape(role or "")
+    initial = (display_name or "?").strip()[:1].upper() or "?"
     _html(f"""
     <div class="orion-user-card">
-    <div class="orion-user-avatar">{initial}</div>
-    <div class="orion-user-name">{display_name}</div>
-    <div class="orion-user-role">{role}</div>
+    <div class="orion-user-avatar">{escape(initial)}</div>
+    <div class="orion-user-name">{safe_name}</div>
+    <div class="orion-user-role">{safe_role}</div>
     </div>
     """)
 
@@ -913,21 +917,27 @@ def render_kv_preview(record: dict):
 
 
 def render_danger_header(title: str = "Danger zone"):
-    _html(f'<p class="orion-danger-title">{title}</p>')
+    from html import escape
+
+    _html(f'<p class="orion-danger-title">{escape(title)}</p>')
 
 
 def section_title(title: str):
-    st.markdown(f'<p class="orion-section-title">{title}</p>', unsafe_allow_html=True)
+    from html import escape
+
+    st.markdown(f'<p class="orion-section-title">{escape(title)}</p>', unsafe_allow_html=True)
 
 
 def render_metric_card(label: str, value: str, delta: str = "", delta_type: str = "neutral"):
+    from html import escape
+
     delta_html = ""
     if delta:
-        delta_html = f'<div class="orion-metric-delta {delta_type}">{delta}</div>'
+        delta_html = f'<div class="orion-metric-delta {escape(delta_type)}">{escape(delta)}</div>'
     _html(f"""
     <div class="orion-metric-card">
-    <div class="orion-metric-label">{label}</div>
-    <div class="orion-metric-value">{value}</div>
+    <div class="orion-metric-label">{escape(label)}</div>
+    <div class="orion-metric-value">{escape(value)}</div>
     {delta_html}
     </div>
     """)

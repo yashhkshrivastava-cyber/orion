@@ -1,3 +1,4 @@
+from html import escape
 from typing import List, Optional
 
 import pandas as pd
@@ -100,12 +101,12 @@ def render_entity_preview(record, meta):
                 st.markdown(
                     f'<p style="margin:0 0 0.15rem;font-size:0.72rem;font-weight:600;'
                     f'letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;">'
-                    f"{label}</p>",
+                    f"{escape(str(label))}</p>",
                     unsafe_allow_html=True,
                 )
                 st.markdown(
                     f'<p style="margin:0 0 0.85rem;font-size:0.9rem;color:#e2e8f0;">'
-                    f"{format_display_value(value)}</p>",
+                    f"{escape(format_display_value(value))}</p>",
                     unsafe_allow_html=True,
                 )
 
