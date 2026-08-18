@@ -12,7 +12,9 @@ write_runtime_env() {
   cat >"$RUNTIME_ENV" <<EOF
 ORION_DB_HOST=$1
 ORION_DB_PORT=$2
-ORION_DB_PASSWORD=${3}
+ORION_DB_USER=$3
+ORION_DB_PASSWORD=$4
+ORION_DB_NAME=orion
 EOF
 }
 
@@ -25,7 +27,7 @@ start_local_postgres() {
   done
 
   bash "$REPO_ROOT/.cursor/db/init_db.sh"
-  write_runtime_env "localhost" "5432" "${ORION_DB_PASSWORD:-orion_dev_password}"
+  write_runtime_env "localhost" "5432" "${ORION_DB_USER:-orion_app}" "${ORION_DB_PASSWORD:-orion_dev_password}"
   echo "PostgreSQL is ready on port 5432."
 }
 
@@ -76,7 +78,7 @@ start_remote_postgres() {
   start_tailscale
   connect_tailscale
   start_db_tunnel
-  write_runtime_env "127.0.0.1" "$DB_TUNNEL_PORT" "${ORION_DB_PASSWORD:-StrongPassword123}"
+  write_runtime_env "127.0.0.1" "$DB_TUNNEL_PORT" "${ORION_DB_USER:-orion_user}" "${ORION_DB_PASSWORD:-StrongPassword123}"
   echo "Remote DB tunnel ready on 127.0.0.1:${DB_TUNNEL_PORT}."
 }
 

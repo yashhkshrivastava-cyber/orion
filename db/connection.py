@@ -4,10 +4,7 @@ from pathlib import Path
 import psycopg2
 
 _ENV_LOADED = False
-# Shared Tailscale Postgres at 100.71.92.51 still uses StrongPassword123.
-# Local Homebrew / cloud-agent Postgres uses orion_dev_password.
-_PASSWORDS = ("orion_dev_password", "StrongPassword123", "change-me-strong-password")
-_TAILSCALE_DB_HOST = "100.71.92.51"
+_LEGACY_TAILSCALE_HOST = "100.71.92.51"
 
 
 def _load_dotenv():
@@ -33,37 +30,23 @@ def _load_dotenv():
             os.environ[key] = value
 
 
-def _env(primary: str, fallback: str, default: str) -> str:
-    return os.environ.get(primary) or os.environ.get(fallback) or default
-
-
-def _connect_params():
-    _load_dotenv()
-    host = _env("ORION_DB_HOST", "DB_HOST", "localhost")
-    default_password = (
-        "StrongPassword123" if host == _TAILSCALE_DB_HOST else "orion_dev_password"
-    )
-    return {
-        "host": host,
-        "database": _env("ORION_DB_NAME", "DB_NAME", "orion"),
-        "user": _env("ORION_DB_USER", "DB_USER", "orion_user"),
-        "password": _env("ORION_DB_PASSWORD", "DB_PASSWORD", default_password),
-        "port": int(_env("ORION_DB_PORT", "DB_PORT", "5432")),
-    }
-
-
 def get_connection():
-    params = _connect_params()
-    tried = []
-    last_error = None
-    for password in (params["password"], *_PASSWORDS):
-        if password in tried:
-            continue
-        tried.append(password)
-        try:
-            return psycopg2.connect(**{**params, "password": password})
-        except psycopg2.OperationalError as exc:
-            if "password authentication failed" not in str(exc):
-                raise
-            last_error = exc
-    raise last_error
+    _load_dotenv()
+    host = os.environ.get("ORION_DB_HOST", "localhost")
+    # Older checkouts exported DB_HOST=100.71.92.51. That Tailscale Postgres
+    # still authenticates as orion_user / StrongPassword123, not orion_app.
+    if host == _LEGACY_TAILSCALE_HOST:
+        return psycopg2.connect(
+            host=host,
+            database="orion",
+            user="orion_user",
+            password="StrongPassword123",
+            port=5432,
+        )
+    return psycopg2.connect(
+        host=host,
+        database=os.environ.get("ORION_DB_NAME", "orion"),
+        user=os.environ.get("ORION_DB_USER", "orion_app"),
+        password=os.environ.get("ORION_DB_PASSWORD", "orion_dev_password"),
+        port=int(os.environ.get("ORION_DB_PORT", "5432")),
+    )
