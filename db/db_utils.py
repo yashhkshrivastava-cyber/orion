@@ -11,6 +11,9 @@ def _db_cursor(commit=False):
         yield cur
         if commit:
             conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()
@@ -41,7 +44,7 @@ def delete_record(table, record_id, pk_column="id"):
 
 def fetch_dropdown(table, display_col, pk_column="id"):
     with _db_cursor() as cur:
-        cur.execute(f"SELECT {pk_column}, {display_col} FROM {table}")
+        cur.execute(f"SELECT {pk_column}, {display_col} FROM {table} ORDER BY {display_col}")
         return cur.fetchall()
 
 
@@ -54,14 +57,15 @@ def fetch_by_id(table, record_id, pk_column="id"):
 
 
 def fetch_top_n(table, n=10):
+    n = max(1, int(n))
     query = f"""
     SELECT * FROM {table}
     ORDER BY created_timestamp DESC
-    LIMIT {n}
+    LIMIT %s
     """
 
     with _db_cursor() as cur:
-        cur.execute(query)
+        cur.execute(query, (n,))
         data = cur.fetchall()
         cols = [desc[0] for desc in cur.description]
         return cols, data

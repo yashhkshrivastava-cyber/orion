@@ -8,6 +8,7 @@ FORM_FIELDS = {
     "case_name": {
         "label": "Case Name",
         "type": "text",
+        "required": True,
     },
     "client_code": {
         "label": "Client",

@@ -81,29 +81,43 @@ def _render_single_field(col, config, record, key_prefix, inputs):
         return st.text_input(config["label"], key=field_key)
 
     if field_type == "number":
-        return st.number_input(config["label"], key=field_key)
+        kwargs = {"key": field_key, "min_value": 0.0, "step": 0.01, "format": "%.2f"}
+        if record is not None and default_val is not None:
+            kwargs["value"] = float(default_val)
+        return st.number_input(config["label"], **kwargs)
 
     if field_type == "integer":
-        return int(st.number_input(config["label"], step=1, key=field_key))
+        kwargs = {"key": field_key, "min_value": 0, "step": 1, "format": "%d"}
+        if record is not None and default_val is not None:
+            kwargs["value"] = int(default_val)
+        value = st.number_input(config["label"], **kwargs)
+        return int(value)
 
     if field_type == "date":
         with st.container(border=True):
             if record is None:
                 use_date = st.checkbox(f"Include {config['label']}", key=f"{field_key}_check")
-            else:
-                has_value = default_val is not None
-                use_date = st.checkbox(
-                    f"Update {config['label']}",
-                    value=has_value,
-                    key=f"{field_key}_check",
+                if use_date:
+                    return st.date_input(config["label"], key=field_key)
+                return None
+
+            has_value = default_val is not None
+            if has_value:
+                clear_date = st.checkbox(
+                    f"Clear {config['label']}",
+                    value=False,
+                    key=f"{field_key}_clear",
                 )
-            if use_date:
-                if record is not None and default_val is not None:
-                    return st.date_input(
-                        config["label"],
-                        value=default_val,
-                        key=field_key,
-                    )
+                if clear_date:
+                    return None
+                return st.date_input(
+                    config["label"],
+                    value=default_val,
+                    key=field_key,
+                )
+
+            set_date = st.checkbox(f"Set {config['label']}", key=f"{field_key}_check")
+            if set_date:
                 return st.date_input(config["label"], key=field_key)
         return None
 
@@ -133,10 +147,12 @@ def _render_single_field(col, config, record, key_prefix, inputs):
         fk_options = {f"{r[1]} ({r[0]})": r[0] for r in fk_data}
         if config.get("optional"):
             fk_options = {"— None —": None, **fk_options}
-        if not fk_data and config.get("optional"):
+        if not fk_data:
+            placeholder = "— None —" if config.get("optional") else "— None available —"
             st.selectbox(
                 config["label"],
-                options=["— None —"],
+                options=[placeholder],
+                disabled=not config.get("optional"),
                 key=field_key,
             )
             return None

@@ -8,6 +8,7 @@ FORM_FIELDS = {
     "employee_name": {
         "label": "Employee Name",
         "type": "text",
+        "required": True,
     },
     "employee_status": {
         "label": "Status",

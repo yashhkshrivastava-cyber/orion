@@ -10,7 +10,7 @@ from dw.registry import DW_SYNC
 from modules.registry import MODULES
 from services.auth_service import can_access_dw, can_access_ods, get_current_user
 from services.dw_loader import run_dw_load
-from services.form_processor import apply_auto_date_fields
+from services.form_processor import apply_auto_date_fields, validate_form_inputs
 from ui.components import format_display_value, format_preview_dataframe, humanize_column, render_entity_preview, select_record
 from ui.form_renderer import render_form_fields
 from ui.panels import action_selector, orion_panel
@@ -95,6 +95,21 @@ def _render_ods_preview(meta):
         st.caption(f"Updated {datetime.now().strftime('%H:%M:%S')}")
 
 
+def _consume_ods_flash():
+    message = st.session_state.pop("ods_flash", None)
+    if message:
+        st.success(message)
+
+
+def _save_or_report(action, callback):
+    try:
+        callback()
+        st.session_state["ods_flash"] = f"Record {action} successfully."
+        st.rerun()
+    except Exception as exc:
+        st.error(f"Could not {action} record: {exc}")
+
+
 def _render_create_form(meta, dataset):
     with orion_panel("Create record", f"Add a new {dataset.lower()} entry"):
         key_prefix = f"create_{dataset}"
@@ -103,9 +118,13 @@ def _render_create_form(meta, dataset):
         )
 
         if submitted:
+            errors = validate_form_inputs(inputs, meta.FORM_FIELDS)
+            if errors:
+                for message in errors:
+                    st.error(message)
+                return
             apply_auto_date_fields(inputs, meta.FORM_FIELDS)
-            insert(meta.TABLE, list(inputs.keys()), list(inputs.values()))
-            st.success("Record created successfully.")
+            _save_or_report("created", lambda: insert(meta.TABLE, list(inputs.keys()), list(inputs.values())))
 
 
 def _render_update_form(meta, dataset):
@@ -125,9 +144,16 @@ def _render_update_form(meta, dataset):
         submitted, inputs = _collect_form_inputs(meta.FORM_FIELDS, record, key_prefix)
 
         if submitted:
+            errors = validate_form_inputs(inputs, meta.FORM_FIELDS)
+            if errors:
+                for message in errors:
+                    st.error(message)
+                return
             apply_auto_date_fields(inputs, meta.FORM_FIELDS, record=record)
-            update(meta.TABLE, list(inputs.keys()), list(inputs.values()), selected_id, pk)
-            st.success("Record updated successfully.")
+            _save_or_report(
+                "updated",
+                lambda: update(meta.TABLE, list(inputs.keys()), list(inputs.values()), selected_id, pk),
+            )
 
 
 def _render_delete_form(meta, dataset):
@@ -146,8 +172,7 @@ def _render_delete_form(meta, dataset):
         confirm = st.checkbox("I understand this deletion is permanent")
         if st.button("Delete record", type="primary", use_container_width=True):
             if confirm:
-                delete_record(meta.TABLE, selected_id, pk)
-                st.success("Record deleted.")
+                _save_or_report("deleted", lambda: delete_record(meta.TABLE, selected_id, pk))
             else:
                 st.warning("Please confirm deletion first.")
 
@@ -157,6 +182,7 @@ def _render_ods_section():
         dataset = st.selectbox("Entity", list(MODULES.keys()), key="ods_entity")
 
     meta = _load_entity_meta(dataset)
+    _consume_ods_flash()
     _render_ods_preview(meta)
 
     action = action_selector(["Create", "Update", "Delete"], key=f"ods_action_{dataset}")

@@ -7,7 +7,8 @@ DISPLAY_COLUMN = "capability_name"
 FORM_FIELDS = {
     "capability_name": {
         "label": "Capability Name",
-        "type": "text"
+        "type": "text",
+        "required": True,
     },
     "capability_head": {
         "label": "Capability Head",

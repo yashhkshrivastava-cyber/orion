@@ -8,5 +8,6 @@ FORM_FIELDS = {
     "expense_type_name": {
         "label": "Expense Type Name",
         "type": "text",
+        "required": True,
     },
 }

@@ -10,6 +10,7 @@ FORM_FIELDS = {
     "client_name": {
         "label": "Client Name",
         "type": "text",
+        "required": True,
     },
     "client_status": {
         "label": "Status",
