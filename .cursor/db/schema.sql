@@ -61,13 +61,28 @@ CREATE TABLE IF NOT EXISTS orion_ods.app_user (
     username           TEXT NOT NULL UNIQUE,
     display_name       TEXT NOT NULL,
     password_hash      TEXT NOT NULL,
-    role               TEXT NOT NULL DEFAULT 'admin',
+    role               TEXT NOT NULL DEFAULT 'viewer',
     is_active          BOOLEAN NOT NULL DEFAULT TRUE,
     ods_access         BOOLEAN NOT NULL DEFAULT FALSE,
     dw_access          BOOLEAN NOT NULL DEFAULT FALSE,
     created_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_timestamp  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE orion_ods.app_user ALTER COLUMN role SET DEFAULT 'viewer';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'app_user_role_check'
+          AND conrelid = 'orion_ods.app_user'::regclass
+    ) THEN
+        ALTER TABLE orion_ods.app_user
+            ADD CONSTRAINT app_user_role_check
+            CHECK (role IN ('admin', 'editor', 'viewer'));
+    END IF;
+END $$;
 
 CREATE SEQUENCE IF NOT EXISTS orion_ods.case_seq START 1;
 

@@ -50,6 +50,15 @@ def _render_user_list():
 
 def _render_create_user():
     with orion_panel("Create user", "Add a new account to the platform"):
+        # Role sits outside the form so ODS/DW defaults refresh when it changes.
+        role = st.selectbox(
+            "Role",
+            ROLES,
+            index=ROLES.index("viewer"),
+            format_func=lambda r: ROLE_LABELS[r],
+            key="create_user_role",
+        )
+        defaults = ROLE_DEFAULT_DATA_ACCESS[role]
         with st.form("create_user_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
@@ -57,13 +66,19 @@ def _render_create_user():
                 display_name = st.text_input("Display name", placeholder="Jane Doe")
             with col2:
                 password = st.text_input("Password", type="password", placeholder="Min. 8 characters")
-                role = st.selectbox("Role", ROLES, format_func=lambda r: ROLE_LABELS[r])
-            defaults = ROLE_DEFAULT_DATA_ACCESS[role]
             access_col1, access_col2 = st.columns(2)
             with access_col1:
-                ods_access = st.checkbox("Operational database (ODS)", value=defaults[0])
+                ods_access = st.checkbox(
+                    "Operational database (ODS)",
+                    value=defaults[0],
+                    key=f"create_ods_{role}",
+                )
             with access_col2:
-                dw_access = st.checkbox("Data warehouse (DW)", value=defaults[1])
+                dw_access = st.checkbox(
+                    "Data warehouse (DW)",
+                    value=defaults[1],
+                    key=f"create_dw_{role}",
+                )
             submitted = st.form_submit_button("Create user", type="primary", use_container_width=True)
 
         if submitted:
