@@ -2,7 +2,7 @@ import psycopg2
 
 def get_connection():
     return psycopg2.connect(
-        host="100.71.92.51",
+        host="localhost",
         database="orion",
         user="orion_user",
         password="StrongPassword123",
