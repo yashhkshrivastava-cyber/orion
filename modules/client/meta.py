@@ -1,51 +1,57 @@
-from utils.location_data import get_all_states
-
 TABLE = "orion_ods.client"
-
-PRIMARY_KEY = "client_code"
 
 DISPLAY_COLUMN = "client_name"
 
 FORM_FIELDS = {
     "client_name": {
         "label": "Client Name",
-        "type": "text",
+        "type": "text"
     },
+
     "client_status": {
         "label": "Status",
         "type": "select",
-        "options": ["Active", "Inactive"],
+        "options": ["Active", "Inactive"]
     },
+
     "client_start_date": {
         "label": "Start Date",
-        "type": "date",
+        "type": "date"
     },
+
     "client_end_date": {
         "label": "End Date",
-        "type": "date",
+        "type": "date"
     },
+
     "client_location_state": {
         "label": "State",
         "type": "select",
-        "options": get_all_states(),
+        "options": [
+            "Maharashtra", "Delhi", "Karnataka", "Tamil Nadu", "UP","MP"
+        ]
     },
+
     "client_location_city": {
         "label": "City",
-        "type": "dependent_select",
-        "depends_on": "client_location_state",
+        "type": "dependent_select",   # 🔥 special type
+        "depends_on": "client_location_state"
     },
+
     "client_type": {
         "label": "Client Type",
         "type": "select",
-        "options": ["Govt", "Private", "MSME"],
+        "options": ["Govt", "Private", "MSME"]
     },
+
     "firm_priority": {
         "label": "Priority",
         "type": "select",
-        "options": ["P1", "P2", "P3"],
+        "options": ["P1", "P2", "P3", None]
     },
+
     "client_onboarded": {
-        "label": "Onboarded Date",
-        "type": "date",
-    },
+        "label": "Onboarded",
+        "type": "boolean"
+    }
 }
