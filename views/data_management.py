@@ -19,6 +19,8 @@ from ui.styles import back_button, page_header, section_title
 LAYER_ODS = "Operational Database"
 LAYER_DW = "Data Warehouse"
 
+ODS_FLASH_KEY = "ods_flash_message"
+
 DW_TABLE_QUERIES = {
     "Business Domain": """
         SELECT business_domain_sk, business_domain_code, business_domain_name,
@@ -78,6 +80,17 @@ def _collect_form_inputs(form_fields, record, key_prefix, submit_label="Save cha
     return submitted, inputs
 
 
+def _flash_after_rerun(message):
+    """Queue a message so it survives the rerun that refreshes the preview."""
+    st.session_state[ODS_FLASH_KEY] = message
+
+
+def _render_flash():
+    message = st.session_state.pop(ODS_FLASH_KEY, None)
+    if message:
+        st.success(message)
+
+
 def _render_ods_preview(meta):
     with orion_panel("ODS preview", "Latest 10 records from orion_ods"):
         cols, data = fetch_top_n(meta.TABLE, 10)
@@ -104,8 +117,13 @@ def _render_create_form(meta, dataset):
 
         if submitted:
             apply_auto_date_fields(inputs, meta.FORM_FIELDS)
-            insert(meta.TABLE, list(inputs.keys()), list(inputs.values()))
-            st.success("Record created successfully.")
+            try:
+                insert(meta.TABLE, list(inputs.keys()), list(inputs.values()))
+            except Exception as exc:
+                st.error(f"Could not create record: {exc}")
+            else:
+                _flash_after_rerun("Record created successfully.")
+                st.rerun()
 
 
 def _render_update_form(meta, dataset):
@@ -126,8 +144,13 @@ def _render_update_form(meta, dataset):
 
         if submitted:
             apply_auto_date_fields(inputs, meta.FORM_FIELDS, record=record)
-            update(meta.TABLE, list(inputs.keys()), list(inputs.values()), selected_id, pk)
-            st.success("Record updated successfully.")
+            try:
+                update(meta.TABLE, list(inputs.keys()), list(inputs.values()), selected_id, pk)
+            except Exception as exc:
+                st.error(f"Could not update record: {exc}")
+            else:
+                _flash_after_rerun("Record updated successfully.")
+                st.rerun()
 
 
 def _render_delete_form(meta, dataset):
@@ -145,11 +168,16 @@ def _render_delete_form(meta, dataset):
         st.divider()
         confirm = st.checkbox("I understand this deletion is permanent")
         if st.button("Delete record", type="primary", use_container_width=True):
-            if confirm:
-                delete_record(meta.TABLE, selected_id, pk)
-                st.success("Record deleted.")
-            else:
+            if not confirm:
                 st.warning("Please confirm deletion first.")
+            else:
+                try:
+                    delete_record(meta.TABLE, selected_id, pk)
+                except Exception as exc:
+                    st.error(f"Could not delete record: {exc}")
+                else:
+                    _flash_after_rerun("Record deleted.")
+                    st.rerun()
 
 
 def _render_ods_section():
@@ -157,6 +185,7 @@ def _render_ods_section():
         dataset = st.selectbox("Entity", list(MODULES.keys()), key="ods_entity")
 
     meta = _load_entity_meta(dataset)
+    _render_flash()
     _render_ods_preview(meta)
 
     action = action_selector(["Create", "Update", "Delete"], key=f"ods_action_{dataset}")
